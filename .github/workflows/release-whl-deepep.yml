@@ -30,10 +30,10 @@ jobs:
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: x64-kernel-build-node
+            runner: ubuntu-24.04
             source-branch: sgl-deepep
           - arch: aarch64
-            runner: arm-kernel-build-node
+            runner: ubuntu-24.04-arm
             source-branch: sgl-deepep
     runs-on: ${{ matrix.runner }}
     steps:

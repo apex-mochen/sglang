@@ -48,9 +48,9 @@ jobs:
         arch: [x86_64, aarch64]
         include:
           - arch: x86_64
-            runner: x64-kernel-build-node
+            runner: ubuntu-24.04
           - arch: aarch64
-            runner: arm-kernel-build-node
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Clean workspace (remove root-owned files from prior runs)
