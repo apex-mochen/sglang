@@ -146,8 +146,12 @@ jobs:
           # deep_gemm imports torch before loading _C.so, so torch must preload the
           # libcudart the cu130 wheel links. Pin the CUDA-matched torch (see sgl-deep-gemm.Dockerfile).
           python3 -m pip install "torch==${TORCH_VER}" --index-url "https://download.pytorch.org/whl/${CU_TAG}" --force-reinstall
-          python3 -m pip install numpy "tilelang==0.1.9" "tile-kernels==1.0.0" "sgl-deep-ep==0.1.2"
-          python3 -m pip install dist/*.whl
+          # sgl-deep-ep's own torch pin wins over the line above: 0.1.2 pinned
+          # torch==2.13.0 and silently downgraded it. 0.1.3rc1 pins TORCH_VER.
+          python3 -m pip install numpy "tilelang==0.1.9" "tile-kernels==1.0.0" "sgl-deep-ep==0.1.3rc1"
+          # --force-reinstall: a base image may already carry this exact version,
+          # in which case pip skips the wheel and the job tests a stale _C.so.
+          python3 -m pip install dist/*.whl --force-reinstall --no-deps
           # Torch pins NCCL 2.29.7, but this DeepEP wheel requires 2.30.7.
           # Override it after every dependency-resolving pip command.
           python3 -m pip install "nvidia-nccl-cu13==2.30.7" --force-reinstall --no-deps
@@ -157,10 +161,18 @@ jobs:
           python3 -c "import deep_gemm; print('deep_gemm:', deep_gemm.__file__)"
           python3 - <<'PY'
           import ctypes
+          import os
           import sys
           import torch
           import deep_ep
+          import deep_gemm
           from tile_kernels.moe import top2_sum_gate
+
+          # Resolve every _C.so symbol now. Lazy PLT binding defers an ABI break to
+          # whichever kernel first calls the missing symbol, so an arch whose tests
+          # skip that path reports a false pass.
+          _c_so = os.path.join(os.path.dirname(deep_gemm.__file__), "_C.so")
+          ctypes.CDLL(_c_so, mode=os.RTLD_NOW | os.RTLD_LOCAL)
 
           # torch.cuda.nccl.version() reports Torch's compiled version, not the loaded library.
           nccl_version = ctypes.c_int()
