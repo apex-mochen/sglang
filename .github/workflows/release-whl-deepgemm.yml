@@ -152,27 +152,22 @@ jobs:
           # --force-reinstall: a base image may already carry this exact version,
           # in which case pip skips the wheel and the job tests a stale _C.so.
           python3 -m pip install dist/*.whl --force-reinstall --no-deps
-          # Torch pins NCCL 2.29.7, but this DeepEP wheel requires 2.30.7.
-          # Override it after every dependency-resolving pip command.
+          # Torch 2.14 pins NCCL 2.30.7, which this DeepEP wheel requires. Reinstall it
+          # after every dependency-resolving pip command so no other package can move it.
           python3 -m pip install "nvidia-nccl-cu13==2.30.7" --force-reinstall --no-deps
           nccl_lib=$(python3 -c "from importlib.metadata import distribution; print(distribution('nvidia-nccl-cu13').locate_file('nvidia/nccl/lib'))")
           export LD_LIBRARY_PATH="${nccl_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
           echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "${GITHUB_ENV}"
           python3 -c "import deep_gemm; print('deep_gemm:', deep_gemm.__file__)"
-          python3 - <<'PY'
+          # tvm-ffi loads _C.so lazily and a later RTLD_NOW dlopen resolves nothing,
+          # so bind eagerly to fail here on any missing symbol.
+          LD_BIND_NOW=1 python3 - <<'PY'
           import ctypes
-          import os
           import sys
           import torch
           import deep_ep
           import deep_gemm
           from tile_kernels.moe import top2_sum_gate
-
-          # Resolve every _C.so symbol now. Lazy PLT binding defers an ABI break to
-          # whichever kernel first calls the missing symbol, so an arch whose tests
-          # skip that path reports a false pass.
-          _c_so = os.path.join(os.path.dirname(deep_gemm.__file__), "_C.so")
-          ctypes.CDLL(_c_so, mode=os.RTLD_NOW | os.RTLD_LOCAL)
 
           # torch.cuda.nccl.version() reports Torch's compiled version, not the loaded library.
           nccl_version = ctypes.c_int()

@@ -49,9 +49,8 @@ qr_out_unavailable(at::Tensor &, at::Tensor &, const at::Tensor &, bool) {
 
 } // namespace torch
 
-// Safe as function-like macros only because 2.14 deletes these names outright
-// (no ATen/ops/{cholesky,qr}*.h remains); the include above is what declares
-// at::Tensor for the signatures.
+// Safe as global macros only because no PyTorch 2.14 header uses these four
+// names; the include above declares at::Tensor for the signatures.
 #define cholesky(...) cholesky_unavailable(__VA_ARGS__)
 #define cholesky_out(...) cholesky_out_unavailable(__VA_ARGS__)
 #define qr(...) qr_unavailable(__VA_ARGS__)
