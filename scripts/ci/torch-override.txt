@@ -1,0 +1,3 @@
+# Published sglang-kernel==0.4.7 pins torch==2.13.0; CI replaces it with the
+# kernel built from this tree. Remove once the pinned kernel pins this torch.
+torch==2.14.0
