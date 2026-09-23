@@ -419,6 +419,18 @@ class SchedulerWeightUpdaterManager:
         assert (
             self._weight_update_in_progress
         ), "end_weight_update called without begin_weight_update"
+
+        received_checksums = None
+        if recv_req.include_received_checksums and self._weight_update_sync_base:
+            received_checksums = self._all_gather_checksum_payloads(
+                self._compute_local_checksum_payload(
+                    action="raw_checksum",
+                    selector=self._weight_update_selector,
+                    allow_quant_error=False,
+                    skip_tensor_list=None,
+                )
+            )
+
         if self._weight_update_sync_base:
             run_post_load = not self._weight_update_loaded
             for _, runner in self.get_model_runners(self._weight_update_selector):
@@ -429,7 +441,9 @@ class SchedulerWeightUpdaterManager:
             self.record_weight_version_after_update(self._weight_update_pending_version)
         self._weight_update_pending_version = None
         torch.distributed.barrier(group=self.tp_cpu_group)
-        return EndWeightUpdateReqOutput(success=success, message=message)
+        return EndWeightUpdateReqOutput(
+            success=success, message=message, received_checksums=received_checksums
+        )
 
     def forget_lora_adapter(self, lora_name: str) -> None:
         """Drop the partial-stream guard entry: a re-registered or unloaded name

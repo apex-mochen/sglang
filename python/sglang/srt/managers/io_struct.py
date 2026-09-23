@@ -2021,11 +2021,13 @@ class EndWeightUpdateReqInput(BaseReq, kw_only=True):
     # {lora_name: {hf_key: sha256}}; when set, each stashed adapter is verified
     # (set equality + per-tensor checksum) before it is applied.
     expected_lora_checksums: Optional[Dict[str, Dict[str, str]]] = None
+    include_received_checksums: bool = False
 
 
 class EndWeightUpdateReqOutput(BaseReq, kw_only=True):
     success: bool
     message: str
+    received_checksums: Optional[List["ChecksumInfo"]] = None
 
 
 class CheckWeightsReqInput(BaseReq, kw_only=True):

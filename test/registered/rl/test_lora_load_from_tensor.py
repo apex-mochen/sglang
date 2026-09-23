@@ -35,7 +35,7 @@ def load_lora_via_stream(engine, lora_name, tensors, config_dict):
             (f"{lora_name}:{key}", tensor) for key, tensor in tensors.items()
         ]
     )
-    success, message = engine.end_weight_update()
+    success, message, _ = engine.end_weight_update()
     return SimpleNamespace(success=success, error_message=message)
 
 
@@ -379,7 +379,7 @@ class TestLoRALoadFromTensor(CustomTestCase):
         self.engine.update_weights_from_tensor(
             named_tensors=[serialized], load_format="flattened_bucket"
         )
-        success, message = self.engine.end_weight_update()
+        success, message, _ = self.engine.end_weight_update()
         self.assertTrue(success, f"Failed: {message}")
 
         output = self.engine.generate(

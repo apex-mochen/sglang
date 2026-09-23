@@ -1453,12 +1453,14 @@ async def end_weight_update(
     obj: Annotated[EndWeightUpdateReqInput, Body()], request: Request
 ):
     """Close the weight-update session and finalize quantized weights."""
-    success, message = await _global_state.tokenizer_manager.end_weight_update(
-        obj, request
+    success, message, received_checksums = (
+        await _global_state.tokenizer_manager.end_weight_update(obj, request)
     )
+    body = {"success": success, "message": message}
+    if received_checksums is not None:
+        body["received_checksums"] = received_checksums
     return ORJSONResponse(
-        {"success": success, "message": message},
-        status_code=HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST,
+        body, status_code=HTTPStatus.OK if success else HTTPStatus.BAD_REQUEST
     )
 
 

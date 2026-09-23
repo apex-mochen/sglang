@@ -89,6 +89,7 @@ from sglang.srt.utils import (
     normalize_serialized_named_tensor_payloads,
 )
 from sglang.srt.utils.msgspec_utils import msgspec_to_builtins
+from sglang.srt.utils.weight_checker import merge_rank_checksums
 from sglang.utils import TypeBasedDispatcher
 
 if TYPE_CHECKING:
@@ -487,7 +488,7 @@ class TokenizerControlMixin:
         self: TokenizerManager,
         obj: EndWeightUpdateReqInput,
         request: Optional[fastapi.Request] = None,
-    ) -> Tuple[bool, str]:
+    ) -> Tuple[bool, str, Optional[List[Dict]]]:
         results = await self._weight_update_session_call(
             self.end_weight_update_communicator, obj
         )
@@ -496,7 +497,8 @@ class TokenizerControlMixin:
         if success:
             self._update_weight_version_if_provided(self._weight_update_pending_version)
         self._weight_update_pending_version = None
-        return success, message
+        received_checksums = merge_rank_checksums([r.received_checksums for r in results])
+        return success, message, received_checksums
 
     async def update_weights_from_distributed(
         self: TokenizerManager,

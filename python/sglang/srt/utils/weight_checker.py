@@ -1,14 +1,26 @@
 import hashlib
 import logging
 import time
-from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Set
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+)
 
+import msgspec
 import torch
 import torch.distributed as dist
 from pydantic import BaseModel, ConfigDict
 
 from sglang.srt.managers.mm_utils import tensor_hash
 from sglang.srt.mem_cache.storage.mmap.mmap_allocator import alloc_mmap
+from sglang.srt.utils.msgspec_utils import msgspec_to_builtins
 from sglang.srt.utils.weight_checker_comparator import (
     CHUNK_NUMEL,
     ComparableWeight,
@@ -75,6 +87,19 @@ def _is_skip_weight_check(name, param, skip_tensor_list=None) -> bool:
     )
 
 
+def merge_rank_checksums(
+    payloads: Sequence[Optional[List[msgspec.Struct]]],
+) -> Optional[List[Dict]]:
+    if all(payload is None for payload in payloads):
+        return None
+    return [
+        msgspec_to_builtins(info)
+        for payload in payloads
+        if payload is not None
+        for info in payload
+    ]
+
+
 def overall_checksum(checksums: Dict[str, str]) -> str:
     h = hashlib.sha256()
     for name in sorted(checksums):
@@ -110,6 +135,8 @@ class WeightChecker:
             )
         elif action == "checksum":
             return self._compute_checksum(skip_tensor_list)
+        elif action == "raw_checksum":
+            return self._compute_raw_checksum()
         else:
             raise Exception(f"Unsupported {action=}")
 
@@ -204,6 +231,18 @@ class WeightChecker:
         )
         return info.model_dump()
 
+    def _compute_raw_checksum(self) -> Dict:
+        checksums = {
+            name: _sha256_tensor(param.data)
+            for name, param in self._get_model().named_parameters()
+        }
+        info = ChecksumInfo(
+            checksums=checksums,
+            per_gpu_checksum=overall_checksum(checksums),
+            parallelism_info=self._parallelism_info(),
+        )
+        return info.model_dump()
+
     def _parallelism_info(self) -> ParallelismInfo:
         ps = self._ps
         return ParallelismInfo(
@@ -225,6 +264,12 @@ class WeightChecker:
 
 def _hash_tensor(t: torch.Tensor) -> str:
     return f"{tensor_hash(t):016x}"
+
+
+def _sha256_tensor(t: torch.Tensor) -> str:
+    return hashlib.sha256(
+        t.detach().cpu().contiguous().flatten().view(torch.uint8).numpy()
+    ).hexdigest()
 
 
 def _check_tensors(
